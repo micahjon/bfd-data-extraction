@@ -1,5 +1,6 @@
 config.js
 .headless-chrome-cache
 node_modules
-thumbnails/*.jpg
-thumbnails/*.png
+results/thumbnails/*.jpg
+results/thumbnails/*.png
+results/missing-fonts.csv

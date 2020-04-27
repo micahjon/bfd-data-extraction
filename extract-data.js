@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 
 const config = require('./config');
 
-module.exports = async (instanceID, urlsToProcess) => {
+module.exports = async (instanceID, urlsToProcess, thumbnailFolder) => {
   const useGPU = true; // Use native device GPU instead of SwiftShader
   const isHeadless = true; // Headless or windowed mode
   const isDebug = false;
@@ -207,6 +207,7 @@ module.exports = async (instanceID, urlsToProcess) => {
           useGPU,
           projectDescription: `${index} / ${urlsToProcess.length}`,
           log,
+          thumbnailFolder,
         });
       } catch (err) {
         log(`!!!\tFailed to open project ${index} / ${urlsToProcess.length}`, fileName, err, '\n');
@@ -239,7 +240,7 @@ module.exports = async (instanceID, urlsToProcess) => {
 };
 
 async function openProjectAndGenerateThumbnail({
-  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log,
+  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log, thumbnailFolder,
 }) {
 
   if (!bfdUrl) throw new Error('BFD path/URL missing');
@@ -334,7 +335,7 @@ async function openProjectAndGenerateThumbnail({
   let thumbFileName;
   if (path) {
     thumbFileName = `${Date.now()}-${bfdFileName.replace(/\.bfd/, `.${thumbnailExtension}`)}`;
-    fs.copyFileSync(path, `./thumbnails/${thumbFileName}`);
+    fs.copyFileSync(path, `${thumbnailFolder}/${thumbFileName}`);
   } else {
     throw 'Failed to download file';
   }
