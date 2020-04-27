@@ -1,3 +1,5 @@
 config.js
 .headless-chrome-cache
 node_modules
+thumbnails/*.jpg
+thumbnails/*.png
