@@ -251,7 +251,7 @@ async function openProjectAndGenerateThumbnail({
   const bfdFileName = bfdUrl.split('/').pop();
   const startTimeFetchingProject = Date.now();
 
-  const dimensions = await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
+  await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
     console.log('Fetching BFD...', args.url);
     BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data }) => {
       if (error) {
@@ -270,25 +270,14 @@ async function openProjectAndGenerateThumbnail({
       BFN.ProjectManager.openProject(
         bfdObject,
         '',
-      );
+      )
+      return resolve();
 
-      // Get project dimensions
-      const { projectWidth, projectHeight } = bfdObject;
-
-      // Get project text
-      const text = bfdObject.transformLabels
-        .map(label => label.labelText.replace(/\s+/g, ' ').trim())
-        .join(' ')
-        .slice(0, 1000);
-
-      return resolve(JSON.stringify({ projectWidth, projectHeight, text }));
     });
 
   }), { url: bfdUrl });
 
   const timeFetchingProject = Date.now() - startTimeFetchingProject;
-
-  const { projectWidth, projectHeight, text } = JSON.parse(dimensions);
 
   // Wait for everything to finish loading
   await waitForLoadingToComplete();
@@ -310,6 +299,18 @@ async function openProjectAndGenerateThumbnail({
     log(`${projectDescription} Fonts need swapped`, bfdFileName, fontsToSwap);
     return { fontsToSwap };
   }
+
+  // Get project text, width & height
+  const { text, projectWidth, projectHeight } = await page.$eval('#open_project_menu', () => {
+    const { projectVO } = BFN.AppModel.sectionValue(BFN.PhotoEditorModel, BFN.CollageMakerModel, BFN.DesignerModel);
+    const text = projectVO.transformLabels
+      .map(label => label.labelText)
+      .map(str => str.replace(/\s+/g, ' ').trim())
+      .join(' ')
+      .slice(0, 1000);
+    const { projectWidth, projectHeight } = projectVO;
+    return Promise.resolve({ text, projectWidth, projectHeight });
+  });
 
   // Generate and download thumbnail
   const thumbnailExtension = await page.$eval('#open_project_menu', () => {
