@@ -97,7 +97,7 @@ module.exports = function addExtractEndpoint(fastify) {
             return;
         }
 
-        // Limit to 100 URLs
+        // Limit amount of URLs processed by a single page (app instance)
         let { urls } = request.body;
         if (urls.length > maxBatchSize) {
             reply.statusCode = 400;
@@ -105,7 +105,7 @@ module.exports = function addExtractEndpoint(fastify) {
             return;
         }
 
-        // Remove duplicates
+        // Remove duplicate URLs
         urls = urls.filter((url, index) => urls.indexOf(url) === index);
 
         // Process URLs
@@ -121,7 +121,7 @@ module.exports = function addExtractEndpoint(fastify) {
         result.fontSwapProjects.forEach(({ fontsToSwap }) => {
             fonts = [...fonts, ...fontsToSwap];
         });
-        fs.appendFileSync(csvPath, fonts.join('\n') + '\n');
+        if (fonts.length) fs.appendFileSync(csvPath, fonts.join('\n') + '\n');
 
         reply.send(result);
     });
