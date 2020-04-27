@@ -61,7 +61,7 @@ const extractOptions = {
             type: 'array', items: {
               type: 'object', properties: {
                 url: { type: 'string' },
-                error: { type: ['string', 'object'] },
+                error: { type: 'string' },
               }
             }
           },
@@ -79,9 +79,9 @@ fastify.post('/extract/', extractOptions, async (request, reply) => {
 
   activeChromeInstances++;
   const instanceID = `${activeChromeInstances}${randomAlphaString(3)}`;
-
   const result = await extractData(instanceID, request.body.urls);
   activeChromeInstances--;
+
   reply.send(result);
 });
 
