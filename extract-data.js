@@ -9,7 +9,6 @@ module.exports = async (instanceID, urlsToProcess) => {
   const useGPU = true; // Use native device GPU instead of SwiftShader
   const isHeadless = true; // Headless or windowed mode
   const isDebug = false;
-  const resetResults = true; // Whether to clear prior saved thumbnails & CSV data and start fresh
   const startTime = Date.now();
   const log = (...args) => console.log(`${instanceID} >`, ...args);
 
@@ -204,6 +203,7 @@ module.exports = async (instanceID, urlsToProcess) => {
           isHeadless,
           useGPU,
           projectDescription: `${index} / ${urlsToProcess.length}`,
+          log,
         });
       } catch (err) {
         log(`!!!\tFailed to open project ${index} / ${urlsToProcess.length}`, fileName, err, '\n');
@@ -256,7 +256,7 @@ async function openProjectAndGenerateThumbnail({
 
   } else {
     timeFetchingProject = await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
-      log('Fetching BFD...', args.url);
+      console.log('Fetching BFD...', args.url);
       BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data, networkTime }) => {
         if (error) {
           BeFunky.logError('Unable to download BFD', error);
@@ -270,7 +270,7 @@ async function openProjectAndGenerateThumbnail({
         }
 
         // Open project in appropriate section
-        log('Opening project');
+        console.log('Opening project');
         BFN.ProjectManager.openProject(
           bfdObject,
           '',
@@ -304,7 +304,7 @@ async function openProjectAndGenerateThumbnail({
 
   // Generate and download thumbnail
   const thumbnailExtension = await page.$eval('#open_project_menu', () => {
-    log('Generating high quality thumbnail...');
+    console.log('Generating high quality thumbnail...');
     return BFN.ProjectManager.createThumbnail(BFN.AppModel.sectionID, 'blob', true)
       .then((blob) => {
         const extension = blob.type === 'image/jpeg' ? 'jpg' : 'png';
@@ -333,7 +333,7 @@ async function openProjectAndGenerateThumbnail({
 
   // Reset app
   await page.$eval('#open_project_menu', () => {
-    log('Resetting...');
+    console.log('Resetting...');
     BFN.UndoManager.reset();
     BeFunky.getModal().modalElement.querySelector('.button--blue').click();
   });
@@ -351,7 +351,7 @@ async function openProjectAndGenerateThumbnail({
   async function waitForLoadingToComplete() {
     await page.$eval('#open_project_menu', () => {
       return new Promise((resolve) => {
-        log('Waiting...');
+        console.log('Waiting...');
         setTimeout(() => waitSomeMore(resolve), 1000);
       });
       function waitSomeMore(callback) {
