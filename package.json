@@ -1,0 +1,15 @@
+{
+  "name": "bfd-data-extraction",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fastify": "^2.13.1",
+    "playwright": "^0.15.0"
+  }
+}
