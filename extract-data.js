@@ -102,6 +102,9 @@ module.exports = async (instanceID, urlsToProcess) => {
         .then((blobSize) => {
           log(`Preloaded ${index} / ${urlsToProcess.length} in ${toSeconds(Date.now() - preloadStartTime)}s`, fileName, formatBytes(blobSize));
 
+          // Add size (in kb) to project
+          Object.assign(project, { sizeInKB: Math.round(blobSize / 1024) });
+
           // Move from loadingProjects -> preloadedProjects
           if (loadingProjects.indexOf(project) === -1) throw new Error('Can\'t find loading URL');
           loadingProjects.splice(loadingProjects.indexOf(project), 1);
@@ -236,50 +239,55 @@ module.exports = async (instanceID, urlsToProcess) => {
 };
 
 async function openProjectAndGenerateThumbnail({
-  page, isDebug, isHeadless, useGPU, bfdPath, bfdUrl, projectDescription, log,
+  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log,
 }) {
 
-  if (!bfdPath && !bfdUrl) throw new Error('BFD path/URL missing');
+  if (!bfdUrl) throw new Error('BFD path/URL missing');
 
   const startTime = Date.now();
 
   // Open BFD file
-  const bfdFileName = (bfdPath || bfdUrl).split('/').pop();
-  let timeFetchingProject = 0;
-  if (bfdPath) {
-    // Load BFD file on device
-    page.on('filechooser', async ({ element }) => {
-      log('Opening BFD...', bfdPath);
-      await element.setInputFiles(bfdPath);
+  const bfdFileName = bfdUrl.split('/').pop();
+  const startTimeFetchingProject = Date.now();
+
+  const dimensions = await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
+    console.log('Fetching BFD...', args.url);
+    BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data }) => {
+      if (error) {
+        BeFunky.logError('Unable to download BFD', error);
+        return reject(error);
+      }
+
+      const bfdObject = data;
+      if (typeof bfdObject !== 'object') {
+        BeFunky.logError('data =', data);
+        return reject('No BFD object');
+      }
+
+      // Open project in appropriate section
+      console.log('Opening project');
+      BFN.ProjectManager.openProject(
+        bfdObject,
+        '',
+      );
+
+      // Get project dimensions
+      const { projectWidth, projectHeight } = bfdObject;
+
+      // Get project text
+      const text = bfdObject.transformLabels
+        .map(label => label.labelText.replace(/\s+/g, ' ').trim())
+        .join(' ')
+        .slice(0, 1000);
+
+      return resolve(JSON.stringify({ projectWidth, projectHeight, text }));
     });
-    await page.waitForFunction('!BFN.UploadSaveShareManager.handleEditorLoadImageOrProject()');
 
-  } else {
-    timeFetchingProject = await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
-      console.log('Fetching BFD...', args.url);
-      BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data, networkTime }) => {
-        if (error) {
-          BeFunky.logError('Unable to download BFD', error);
-          return reject(error);
-        }
+  }), { url: bfdUrl });
 
-        const bfdObject = data;
-        if (typeof bfdObject !== 'object') {
-          BeFunky.logError('data =', data);
-          return reject('No BFD object');
-        }
+  const timeFetchingProject = Date.now() - startTimeFetchingProject;
 
-        // Open project in appropriate section
-        console.log('Opening project');
-        BFN.ProjectManager.openProject(
-          bfdObject,
-          '',
-        );
-
-        return resolve(networkTime);
-      });
-    }), { url: bfdUrl });
-  }
+  const { projectWidth, projectHeight, text } = JSON.parse(dimensions);
 
   // Wait for everything to finish loading
   await waitForLoadingToComplete();
@@ -346,6 +354,9 @@ async function openProjectAndGenerateThumbnail({
 
   return {
     thumbURL: `/thumbnails/${thumbFileName}`,
+    projectWidth,
+    projectHeight,
+    text,
   };
 
   async function waitForLoadingToComplete() {

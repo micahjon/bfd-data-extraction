@@ -44,6 +44,10 @@ const extractOptions = {
               type: 'object', properties: {
                 url: { type: 'string' },
                 thumbURL: { type: 'string' },
+                sizeInKB: { type: 'number' },
+                projectWidth: { type: 'number' },
+                projectHeight: { type: 'number' },
+                text: { type: 'string' },
               }
             }
           },
