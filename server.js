@@ -1,6 +1,5 @@
-// Require the framework and instantiate it
-// https://www.fastify.io/
-const fastify = require('fastify')({ logger: true })
+const path = require('path')
+const fastify = require('fastify')({ logger: true }) // https://www.fastify.io/
 
 const extractData = require('./extract-data');
 const { randomAlphaString } = require('./lib');
@@ -8,11 +7,18 @@ const { randomAlphaString } = require('./lib');
 let activeChromeInstances = 0;
 const maxChromeInstances = 3;
 
-// Declare a route
+// Home route (just for testing)
 fastify.get('/', async (request, reply) => {
-  return { hello: 'world' }
+  return { welcome: 'to the BFD thumbnail extraction server' }
 })
 
+// Downloading thumbnails
+fastify.register(require('fastify-static'), {
+  root: path.join(__dirname, 'thumbnails'),
+  prefix: '/thumbnails/',
+})
+
+// Extracting thumbnails and other data from BFDs
 const extractOptions = {
   schema: {
     body: {
