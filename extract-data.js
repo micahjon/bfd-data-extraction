@@ -336,7 +336,7 @@ async function openProjectAndGenerateThumbnail({
   const path = await download.path();
   let thumbFileName;
   if (path) {
-    thumbFileName = `${Date.now()}-${bfdFileName.replace(/\.bfd/, `.${thumbnailExtension}`)}`;
+    thumbFileName = `${bfdFileName.replace(/\.bfd/, `.bfd_thumb_v1.${thumbnailExtension}`)}`;
     fs.copyFileSync(path, `${thumbnailFolder}/${thumbFileName}`);
   } else {
     throw 'Failed to download file';
