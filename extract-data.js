@@ -306,6 +306,7 @@ async function openProjectAndGenerateThumbnail({
     const text = projectVO.transformLabels
       .map(label => label.labelText)
       .map(str => str.replace(/\s+/g, ' ').trim())
+      .filter(str => str && !BFN.FabricManager.isDefaultText(str))
       .join(' ')
       .slice(0, 1000);
     const { projectWidth, projectHeight } = projectVO;
