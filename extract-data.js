@@ -5,12 +5,11 @@ const { chromium } = require('playwright');
 
 const config = require('./config');
 
-module.exports = async (instanceID, urlsToProcess, thumbnailFolder) => {
+module.exports = async (urlsToProcess, thumbnailFolder, log) => {
   const useGPU = true; // Use native device GPU instead of SwiftShader
   const isHeadless = true; // Headless or windowed mode
   const isDebug = false;
   const startTime = Date.now();
-  const log = (...args) => console.log(`${instanceID} >`, ...args);
 
   log(`Processing ${urlsToProcess.length} BFD URLs...`);
 

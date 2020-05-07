@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
 const extractData = require('../extract-data');
 const { randomAlphaString } = require('../lib');
 
@@ -113,7 +114,19 @@ module.exports = function addExtractEndpoint(fastify) {
         activeChromeInstances++;
         const instanceID = `${activeChromeInstances}${randomAlphaString(3)}`;
         const thumbnailFolder = path.join(__dirname, '/../results/thumbnails');
-        const result = await extractData(instanceID, request.body.urls, thumbnailFolder);
+
+
+        const logPath = path.join(__dirname, `/../logs/${new Date().toISOString()} #${instanceID}.txt`);
+        const logFile = fs.createWriteStream(logPath, { flags: 'a' });
+        const log = (...args) => {
+            // Log to console, and to file
+            console.log(`${instanceID} >`, ...args);
+            logFile.write(util.format.apply(null, args) + '\n');
+        };
+
+        log('Booting up Chrome instance', instanceID);
+
+        const result = await extractData(request.body.urls, thumbnailFolder, log);
         activeChromeInstances--;
 
         // Add missing fonts to CSV

@@ -4,3 +4,4 @@ node_modules
 results/thumbnails/*.jpg
 results/thumbnails/*.png
 results/missing-fonts.csv
+logs/*.txt
