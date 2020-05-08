@@ -48,6 +48,7 @@ module.exports = function addExtractEndpoint(fastify) {
                                     projectHeight: { type: 'number' },
                                     text: { type: 'string' },
                                     sectionID: { type: 'string' },
+                                    version: { type: 'number' },
                                 },
                             },
                         },

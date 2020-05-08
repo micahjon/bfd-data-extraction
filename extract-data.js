@@ -250,7 +250,7 @@ async function openProjectAndGenerateThumbnail({
   const bfdFileName = bfdUrl.split('/').pop();
   const startTimeFetchingProject = Date.now();
 
-  await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
+  const bfdVersion = await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
     console.log('Fetching BFD...', args.url);
     BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data }) => {
       if (error) {
@@ -270,7 +270,7 @@ async function openProjectAndGenerateThumbnail({
         bfdObject,
         '',
       )
-      return resolve();
+      return resolve(parseInt(bfdObject.version) || 1);
 
     });
 
@@ -361,6 +361,7 @@ async function openProjectAndGenerateThumbnail({
     projectHeight,
     text,
     sectionID,
+    version: bfdVersion,
   };
 
   async function waitForLoadingToComplete() {
