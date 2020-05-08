@@ -111,6 +111,22 @@ module.exports = function addExtractEndpoint(fastify) {
         // Remove duplicate URLs
         urls = urls.filter((url, index) => urls.indexOf(url) === index);
 
+        // Convert thumbnail URLs to BFD URLs + isThumbTransparent flag
+        urls = urls.map((bfdOrThumbURL) => {
+            if (bfdOrThumbURL.endsWith('.bfd')) return { url: bfdOrThumbURL };
+
+            const thumbMatch = bfdOrThumbURL.match(/\.bfd_thumb\.(jpg|png)$/);
+            if (!thumbMatch) return false;
+
+            return {
+                url: bfdOrThumbURL.replace(thumbMatch[0], '.bfd'),
+                isThumbTransparent: thumbMatch[1] === 'png',
+            }
+        });
+
+        // Remove invalid data
+        urls = urls.filter(Boolean);
+
         // Process URLs
         activeChromeInstances++;
         const instanceID = `${activeChromeInstances}${randomAlphaString(3)}`;
@@ -127,7 +143,7 @@ module.exports = function addExtractEndpoint(fastify) {
 
         log('Booting up Chrome instance', instanceID);
 
-        const result = await extractData(request.body.urls, thumbnailFolder, log);
+        const result = await extractData(urls, thumbnailFolder, log);
         activeChromeInstances--;
 
         // Add missing fonts to CSV

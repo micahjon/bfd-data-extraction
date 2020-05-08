@@ -58,7 +58,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
     // Each object in queue is of the form: { url <string>, index: <number> }
     // where index starts at 1 (just used for logging)
     const inParallel = 5;
-    const queuedProjects = urlsToProcess.map((url, index) => ({ index: index + 1, url }));
+    const queuedProjects = urlsToProcess.map(({ url, isThumbTransparent }, index) => ({ index: index + 1, url, isThumbTransparent }));
     const loadingProjects = [];
     const preloadedProjects = [];
 
@@ -191,7 +191,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
 
       // Open next project
       const project = preloadedProjects.shift();
-      const { url, index } = project;
+      const { url, isThumbTransparent, index } = project;
       const fileName = url.split('/').pop();
       log(`${index} / ${urlsToProcess.length} Opening project...`, fileName);
 
@@ -202,6 +202,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
           page,
           isDebug,
           bfdUrl: url,
+          isThumbTransparent,
           isHeadless,
           useGPU,
           projectDescription: `${index} / ${urlsToProcess.length}`,
@@ -239,7 +240,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
 };
 
 async function openProjectAndGenerateThumbnail({
-  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log, thumbnailFolder,
+  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log, thumbnailFolder, isThumbTransparent,
 }) {
 
   if (!bfdUrl) throw new Error('BFD path/URL missing');
@@ -314,9 +315,56 @@ async function openProjectAndGenerateThumbnail({
   });
 
   // Generate and download thumbnail
-  const thumbnailExtension = await page.$eval('#open_project_menu', () => {
+  const thumbnailExtension = await page.$eval('#open_project_menu', (el, args) => {
     console.log('Generating high quality thumbnail...');
-    return BFN.ProjectManager.createThumbnail(BFN.AppModel.sectionID, 'blob', true)
+
+    //
+    // Modified version of BFN.ProjectManager.createThumbnail
+    // - Always creates high quality thumbnail (JPG or PNG is passed in)
+    // - Set up savePreviewBlob() to download the Blob
+    //
+
+    const { isAvailable, reason } = BFN.ProjectManager.checkThumbnailAvailability(args.sectionID);
+    if (!isAvailable) return Promise.reject(reason);
+
+    let texture;
+    switch (args.sectionID) {
+      case 'editor':
+        texture = BFN.PhotoEditorCanvas.getFlattenedImage();
+        break;
+      case 'collage':
+        texture = BFN.CollageMakerCanvas.getFlattenedImage();
+        break;
+      case 'designer':
+        texture = BFN.DesignerCanvas.getFlattenedImage();
+        break;
+    }
+    if (!texture) return Promise.reject('no_flattened_image');
+
+    const aspectRatio = texture.width / texture.height;
+
+    // Like aspect ratio, but always >= 1
+    const sideRatio = aspectRatio >= 1 ? aspectRatio : 1 / aspectRatio;
+
+    // Create a thumbnail such that it's shortest side is at least 720 pixels
+    // if possible (but don't up-scale project)
+    const maxSideLength = Math.round(720 * sideRatio);
+
+    const [thumbWidth, thumbHeight] = BFN.TextureUtils.getScaledDimensions(texture, { maxWidth: maxSideLength, maxHeight: maxSideLength });
+
+    // Don't resize if the texture is already the right size (e.g. for small projects)
+    const thumbTexture = texture.width === thumbWidth && texture.height === thumbHeight
+      ? texture
+      : BFN.Util.getThumbTexture(texture, Math.max(thumbWidth, thumbHeight));
+
+    const quality = 1;
+
+    // Allow transparency to be overriden to match prior thumbnail
+    const isTransparent = typeof args.isThumbTransparent === 'boolean'
+      ? args.isThumbTransparent
+      : BFN.Util.isTransparent(thumbTexture);
+
+    const result = BFN.TextureUtils.textureToBlob(thumbTexture, { isTransparent, quality })
       .then((blob) => {
         const extension = blob.type === 'image/jpeg' ? 'jpg' : 'png';
         const fileName = `thumbnail.${extension}`;
@@ -326,7 +374,13 @@ async function openProjectAndGenerateThumbnail({
         };
         return extension;
       });
-  });
+
+    texture.destroyGC(true);
+    thumbTexture.destroyGC(true);
+
+    return result;
+
+  }, { isThumbTransparent, sectionID });
 
   const [download] = await Promise.all([
     page.waitForEvent('download'), // wait for download to start
