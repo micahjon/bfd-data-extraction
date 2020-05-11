@@ -148,12 +148,25 @@ module.exports = function addExtractEndpoint(fastify) {
         activeChromeInstances--;
 
         // Add missing fonts to CSV
-        const csvPath = path.join(__dirname, '/../results/missing-fonts.csv');
+        const fontsCsvPath = path.join(__dirname, '/../results/missing-fonts.csv');
         let fonts = [];
         result.fontSwapProjects.forEach(({ fontsToSwap }) => {
             fonts = [...fonts, ...fontsToSwap];
         });
-        if (fonts.length) fs.appendFileSync(csvPath, fonts.join('\n') + '\n');
+        if (fonts.length) fs.appendFileSync(fontsCsvPath, fonts.join('\n') + '\n');
+
+        // Add transparency mismatches to CSV
+        // This is when thumb transparency doesn't match project
+        const transparencyCsvPath = path.join(__dirname, '/../results/transparency-mismatches.csv');
+        const transparencyMismatches = []
+        result.openedProjects
+            .forEach((project) => {
+                if (project.transparencyMismatch) {
+                    transparencyMismatches.push(project.thumbURL);
+                }
+                delete project.transparencyMismatch;
+            })
+        if (transparencyMismatches.length) fs.appendFileSync(transparencyCsvPath, transparencyMismatches.join('\n') + '\n');
 
         reply.send(result);
     });

@@ -315,7 +315,7 @@ async function openProjectAndGenerateThumbnail({
   });
 
   // Generate and download thumbnail
-  const thumbnailExtension = await page.$eval('#open_project_menu', (el, args) => {
+  const { extension: thumbnailExtension, transparencyMismatch } = await page.$eval('#open_project_menu', (el, args) => {
     console.log('Generating high quality thumbnail...');
 
     //
@@ -359,10 +359,12 @@ async function openProjectAndGenerateThumbnail({
 
     const quality = 1;
 
+    const isProjectTransparent = BFN.Util.isTransparent(thumbTexture);
+
     // Allow transparency to be overriden to match prior thumbnail
     const isTransparent = typeof args.isThumbTransparent === 'boolean'
       ? args.isThumbTransparent
-      : BFN.Util.isTransparent(thumbTexture);
+      : isProjectTransparent;
 
     const result = BFN.TextureUtils.textureToBlob(thumbTexture, { isTransparent, quality })
       .then((blob) => {
@@ -372,7 +374,7 @@ async function openProjectAndGenerateThumbnail({
           saveAs(blob, fileName);
           return true;
         };
-        return extension;
+        return { extension, transparencyMismatch: args.isThumbTransparent === !isProjectTransparent };
       });
 
     texture.destroyGC(true);
@@ -417,6 +419,7 @@ async function openProjectAndGenerateThumbnail({
     sectionID,
     version: bfdVersion,
     sourceTemplateID: sourceTemplateID || '',
+    transparencyMismatch,
   };
 
   async function waitForLoadingToComplete() {

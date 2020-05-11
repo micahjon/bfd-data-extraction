@@ -4,4 +4,5 @@ node_modules
 results/thumbnails/*.jpg
 results/thumbnails/*.png
 results/missing-fonts.csv
+results/transparency-mismatches.csv
 logs/*.txt
