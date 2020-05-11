@@ -236,6 +236,13 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
 
   })
 
+  function logCacheDirectorySize(directory) {
+    try {
+      log('Cache size:', childProcess.execSync(`du -sh ${directory}`).toString().trim());
+    } catch (e) {
+      log(`Unable to get cache size: ${e}`);
+    }
+  }
 
 };
 
@@ -299,6 +306,27 @@ async function openProjectAndGenerateThumbnail({
     log(`${projectDescription} Fonts need swapped`, bfdFileName, fontsToSwap);
     return { fontsToSwap };
   }
+
+  // Make sure project has loaded
+  await page.$eval('#open_project_menu', () => {
+    if (BeFunky.getModal()) {
+      const { modalElement } = BeFunky.getModal();
+      const text = modalElement.textContent.split('OK, Got It!')[0];
+
+      // Dismiss modal
+      BeFunky.closeModal(modalElement.id);
+
+      // Reset project (just as a precaution)
+      console.log('Resetting...');
+      BFN.UndoManager.reset();
+      try {
+        BeFunky.getModal().modalElement.querySelector('.button--blue').click();
+      } catch (err) { }
+
+      // Throw error so this template is marked as unopened
+      throw text;
+    }
+  });
 
   // Get project text, width & height
   const { text, projectWidth, projectHeight, sectionID, sourceTemplateID } = await page.$eval('#open_project_menu', () => {
@@ -473,10 +501,3 @@ function formatBytes(bytes, decimals = 1) {
   return `${kb.toFixed(decimals)} KB`;
 }
 
-function logCacheDirectorySize(directory) {
-  try {
-    log('Cache size:', childProcess.execSync(`du -sh ${directory}`).toString().trim());
-  } catch (e) {
-    log(`Unable to get cache size: ${e}`);
-  }
-}
