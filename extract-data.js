@@ -301,7 +301,7 @@ async function openProjectAndGenerateThumbnail({
   }
 
   // Get project text, width & height
-  const { text, projectWidth, projectHeight, sectionID } = await page.$eval('#open_project_menu', () => {
+  const { text, projectWidth, projectHeight, sectionID, sourceTemplateID } = await page.$eval('#open_project_menu', () => {
     const { projectVO } = BFN.AppModel.sectionValue(BFN.PhotoEditorModel, BFN.CollageMakerModel, BFN.DesignerModel);
     const text = projectVO.transformLabels
       .map(label => label.labelText)
@@ -309,9 +309,9 @@ async function openProjectAndGenerateThumbnail({
       .filter(str => str && !BFN.FabricManager.isDefaultText(str))
       .join(' ')
       .slice(0, 1000);
-    const { projectWidth, projectHeight } = projectVO;
+    const { projectWidth, projectHeight, sourceTemplateID } = projectVO;
     const sectionID = projectVO.section;
-    return Promise.resolve({ text, projectWidth, projectHeight, sectionID });
+    return Promise.resolve({ text, projectWidth, projectHeight, sectionID, sourceTemplateID });
   });
 
   // Generate and download thumbnail
@@ -416,6 +416,7 @@ async function openProjectAndGenerateThumbnail({
     text,
     sectionID,
     version: bfdVersion,
+    sourceTemplateID: sourceTemplateID || '',
   };
 
   async function waitForLoadingToComplete() {
