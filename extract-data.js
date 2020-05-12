@@ -44,6 +44,12 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
   // Wait for first section to open
   await page.waitForFunction('window.BFN && BFN.openedSections.length');
 
+  // Tell browser to start new (instead of using autosave) when opening
+  // a section. This helps prevent issues where for some reason, resetting
+  // a project section doesn't work, so we're presented with the side by side
+  // modal
+  await page.waitForFunction('!BFN.SettingsManager.updateSetting("autosave", "no")');
+
   if (isDebug) {
     // Log anything in the console
     page.on('console', (msg) => {
