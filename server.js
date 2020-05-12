@@ -1,7 +1,12 @@
 const path = require('path');
 const fastify = require('fastify')({ logger: true }); // https://www.fastify.io/
+const changeTimeoutPlugin = require('fastify-server-timeout')
 const addExtractEndpoint = require('./endpoints/extract');
 const exposeThumbnailsFolder = require('./endpoints/thumbnails');
+
+fastify.register(changeTimeoutPlugin, {
+    serverTimeout: 1000 * 60 * 5, // 5 minutes
+});
 
 // Home route (just for testing)
 fastify.get('/', async (request, reply) => {

@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "fastify": "^2.13.1",
+    "fastify-server-timeout": "^0.1.1",
     "fastify-static": "^2.7.0",
     "playwright": "^0.15.0"
   }
