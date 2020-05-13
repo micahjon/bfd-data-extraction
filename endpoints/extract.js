@@ -144,8 +144,26 @@ module.exports = function addExtractEndpoint(fastify) {
 
         log('Booting up Chrome instance', instanceID);
 
-        const result = await extractData(urls, thumbnailFolder, log);
+        const forceTerminate = {};
+
+        // Never wait longer than 4.5 minutes
+        let hasTimedOut = false;
+        const timeout = setTimeout(() => {
+            log('\nRequest timed out\n');
+            hasTimedOut = true;
+
+            reply.statusCode = 503;
+            reply.send({ error: `Timed out` });
+
+            forceTerminate.exit();
+            activeChromeInstances--;
+        }, 1000 * 60 * 4.5);
+
+        const result = await extractData(urls, thumbnailFolder, log, forceTerminate);
+        if (hasTimedOut) return;
+
         activeChromeInstances--;
+        clearTimeout(timeout);
 
         // Add missing fonts to CSV
         const fontsCsvPath = path.join(__dirname, '/../results/missing-fonts.csv');

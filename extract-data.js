@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 
 const config = require('./config');
 
-module.exports = async (urlsToProcess, thumbnailFolder, log) => {
+module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}) => {
   const useGPU = true; // Use native device GPU instead of SwiftShader
   const isHeadless = true; // Headless or windowed mode
   const isDebug = false;
@@ -28,6 +28,14 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
   const context = await browser.newContext({
     acceptDownloads: true,
   });
+
+  // Allow parent process to exit
+  let wasTerminated = false;
+  forceTerminate.exit = async () => {
+    wasTerminated = true;
+    await context.close();
+    await browser.close();
+  };
 
   // Add testing flags
   await context.addCookies([{
@@ -235,6 +243,8 @@ module.exports = async (urlsToProcess, thumbnailFolder, log) => {
       }
 
       if (isDebug && Math.random() > 0.8) logCacheDirectorySize(cacheDirectory);
+
+      if (wasTerminated) return resolveQueue({ error: 'terminated' });
 
       // Move on to next project now that app is reset
       openNextProject();
