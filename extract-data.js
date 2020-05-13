@@ -52,12 +52,6 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
   // Wait for first section to open
   await page.waitForFunction('window.BFN && BFN.openedSections.length');
 
-  // Tell browser to start new (instead of using autosave) when opening
-  // a section. This helps prevent issues where for some reason, resetting
-  // a project section doesn't work, so we're presented with the side by side
-  // modal
-  await page.waitForFunction('!BFN.SettingsManager.updateSetting("autosave", "no")');
-
   if (isDebug) {
     // Log anything in the console
     page.on('console', (msg) => {
@@ -281,6 +275,11 @@ async function openProjectAndGenerateThumbnail({
     BFN.PhotoEditorModel.hasUnsavedChanges = false;
     BFN.CollageMakerModel.hasUnsavedChanges = false;
     BFN.DesignerModel.hasUnsavedChanges = false;
+
+    // Remove any thumbnails that would indicate that an autosave exists
+    BFN.ProjectService.removeLocalAsset('editor', 'image', 'editor_thumb');
+    BFN.ProjectService.removeLocalAsset('collage', 'image', 'collage_thumb');
+    BFN.ProjectService.removeLocalAsset('designer', 'image', 'designer_thumb');
 
     BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data }) => {
       if (error) {
