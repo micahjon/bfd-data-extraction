@@ -276,6 +276,12 @@ async function openProjectAndGenerateThumbnail({
 
   const bfdVersion = await page.$eval('#open_project_menu', (el, args) => new Promise((resolve, reject) => {
     console.log('Fetching BFD...', args.url);
+
+    // Ignore any "unsaved changes"
+    BFN.PhotoEditorModel.hasUnsavedChanges = false;
+    BFN.CollageMakerModel.hasUnsavedChanges = false;
+    BFN.DesignerModel.hasUnsavedChanges = false;
+
     BFN.SavedProjectService.getBefunkyBfd(args.url, ({ error, data }) => {
       if (error) {
         BeFunky.logError('Unable to download BFD', error);
