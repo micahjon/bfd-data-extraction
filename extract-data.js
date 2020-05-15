@@ -32,6 +32,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
   // Allow parent process to exit
   let wasTerminated = false;
   forceTerminate.exit = async () => {
+    log('Request timed out');
     wasTerminated = true;
     await context.close();
     await browser.close();
@@ -162,41 +163,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
 
       // Every project has been attempted
       if (!preloadedProjects.length && !queuedProjects.length && !loadingProjects.length) {
-        log('Finished');
-        await context.close();
-        await browser.close();
-
-        const totalTime = Date.now() - startTime;
-        const perBFD = openedProjects.length ? `(${toSeconds(totalTime / openedProjects.length)}s / BFD)` : '';
-        const resultText = `Generated thumbnails for ${openedProjects.length} / ${urlsToProcess.length} BFDs in ${toSeconds(totalTime)}s ${perBFD}`;
-        log(resultText);
-        if (missingProjects.length) {
-          log(`${missingProjects.length} projects couldn't be downloaded:`);
-          missingProjects.forEach(({ index, url }) => {
-            log(`\t${index} / ${urlsToProcess.length} ${url}`);
-          });
-        }
-        if (fontSwapProjects.length) {
-          log(`${fontSwapProjects.length} projects had missing/copyrighted fonts:`);
-          fontSwapProjects.forEach(({ index, url, fontsToSwap }) => {
-            log(`\t${index} / ${urlsToProcess.length} ${url.split('/').pop()} \t${JSON.stringify(fontsToSwap)}`);
-          });
-        }
-        if (unopenedProjects.length) {
-          log(`${unopenedProjects.length} projects couldn't be opened:`);
-          unopenedProjects.forEach(({ index, url }) => {
-            log(`\t${index} / ${urlsToProcess.length} ${url}`);
-          });
-        }
-
-        return resolveQueue({
-          result: resultText,
-          // Remove irrelevant index property just used for logging
-          openedProjects: openedProjects.map(p => { delete p.index; return p; }),
-          missingProjects: missingProjects.map(p => { delete p.index; return p; }),
-          fontSwapProjects: fontSwapProjects.map(p => { delete p.index; return p; }),
-          unopenedProjects: unopenedProjects.map(p => { delete p.index; return p; }),
-        });
+        return resolveQueue(cleanupBrowserAndGetResults());
       }
 
       // Projects are still preloading...
@@ -243,10 +210,50 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
 
       if (isDebug && Math.random() > 0.8) logCacheDirectorySize(cacheDirectory);
 
-      if (wasTerminated) return resolveQueue({ error: 'terminated' });
+      if (wasTerminated) return resolveQueue(cleanupBrowserAndGetResults());
 
       // Move on to next project now that app is reset
       openNextProject();
+    }
+
+    async function cleanupBrowserAndGetResults() {
+      log('Finished');
+      try {
+        await context.close();
+        await browser.close();
+      } catch (err) { }
+
+      const totalTime = Date.now() - startTime;
+      const perBFD = openedProjects.length ? `(${toSeconds(totalTime / openedProjects.length)}s / BFD)` : '';
+      const resultText = `Generated thumbnails for ${openedProjects.length} / ${urlsToProcess.length} BFDs in ${toSeconds(totalTime)}s ${perBFD}`;
+      log(resultText);
+      if (missingProjects.length) {
+        log(`${missingProjects.length} projects couldn't be downloaded:`);
+        missingProjects.forEach(({ index, url }) => {
+          log(`\t${index} / ${urlsToProcess.length} ${url}`);
+        });
+      }
+      if (fontSwapProjects.length) {
+        log(`${fontSwapProjects.length} projects had missing/copyrighted fonts:`);
+        fontSwapProjects.forEach(({ index, url, fontsToSwap }) => {
+          log(`\t${index} / ${urlsToProcess.length} ${url.split('/').pop()} \t${JSON.stringify(fontsToSwap)}`);
+        });
+      }
+      if (unopenedProjects.length) {
+        log(`${unopenedProjects.length} projects couldn't be opened:`);
+        unopenedProjects.forEach(({ index, url }) => {
+          log(`\t${index} / ${urlsToProcess.length} ${url}`);
+        });
+      }
+
+      return {
+        result: resultText,
+        // Remove irrelevant index property just used for logging
+        openedProjects: openedProjects.map(p => { delete p.index; return p; }),
+        missingProjects: missingProjects.map(p => { delete p.index; return p; }),
+        fontSwapProjects: fontSwapProjects.map(p => { delete p.index; return p; }),
+        unopenedProjects: unopenedProjects.map(p => { delete p.index; return p; }),
+      };
     }
 
   })

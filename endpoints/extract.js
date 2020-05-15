@@ -4,9 +4,12 @@ const util = require('util');
 const extractData = require('../extract-data');
 const { randomAlphaString } = require('../lib');
 
-let activeChromeInstances = 0;
+// Only allow one batch to run at a time
+let isRunning = false;
+
+const timeoutAfterMs = 1000 * 60 * 4.5;
 const maxChromeInstances = 3;
-const maxBatchSize = 75; // How many BFDs to open per API request
+const maxBatchSize = 75; // How many BFDs to open per Chrome instance
 
 module.exports = function addExtractEndpoint(fastify) {
     // Extracting thumbnails and other data from BFDs
@@ -92,22 +95,24 @@ module.exports = function addExtractEndpoint(fastify) {
         },
     };
     fastify.post('/extract/', extractOptions, async (request, reply) => {
-        // Limit to 3 headless Chrome instances
-        if (activeChromeInstances >= maxChromeInstances) {
+        // Limit to one request at a time
+        if (isRunning) {
             reply.statusCode = 503;
             reply.send({
-                error: `Too many active Chrome instances. Limit = ${maxChromeInstances}`,
+                error: `Already running, please wait.`,
             });
             return;
         }
 
         // Limit amount of URLs processed by a single page (app instance)
         let { urls } = request.body;
-        if (urls.length > maxBatchSize) {
+        if (urls.length > maxChromeInstances * maxBatchSize) {
             reply.statusCode = 400;
-            reply.send({ error: `Too many URLs. Limit = ${maxBatchSize}` });
+            reply.send({ error: `Too many URLs. Limit = ${maxChromeInstances * maxBatchSize}` });
             return;
         }
+
+        isRunning = true;
 
         // Remove duplicate URLs
         urls = urls.filter((url, index) => urls.indexOf(url) === index);
@@ -129,41 +134,85 @@ module.exports = function addExtractEndpoint(fastify) {
         urls = urls.filter(Boolean);
 
         // Process URLs
-        activeChromeInstances++;
-        const instanceID = `${activeChromeInstances}${randomAlphaString(3)}`;
         const thumbnailFolder = path.join(__dirname, '/../results/thumbnails');
 
+        // Divide BFDs up into batches
+        const batches = {};
+        const batchSizes = {};
+        const batchTerminations = {};
+        const batchID = randomAlphaString(3);
+        const batchSize = Math.ceil(urls.length / maxChromeInstances);
 
-        const logPath = path.join(__dirname, `/../logs/${new Date().toISOString()} #${instanceID}.txt`);
-        const logFile = fs.createWriteStream(logPath, { flags: 'a' });
-        const log = (...args) => {
-            // Log to console, and to file
-            console.log(`${instanceID} >`, ...args);
-            logFile.write(util.format.apply(null, args) + '\n');
-        };
+        for (let index = 0; index < maxChromeInstances; index++) {
+            const instanceID = `${batchID} ${index + 1} ${randomAlphaString(3)}`;
+            const urlsInBatch = urls.slice(index * batchSize, (index + 1) * batchSize);
+            if (urlsInBatch.length) {
+                batches[instanceID] = urlsInBatch;
+                batchSizes[instanceID] = urlsInBatch.length;
+                batchTerminations[instanceID] = {};
+            }
+        }
 
-        log('Booting up Chrome instance', instanceID);
+        const instanceIDs = Object.keys(batches);
+        console.log(`Starting ${instanceIDs.length} batch(s)`, batchSizes);
 
-        const forceTerminate = {};
+        const runBatch = async (instanceID, urlsInBatch, forceTerminate) => {
+            const logPath = path.join(__dirname, `/../logs/${new Date().toISOString()} #${instanceID}.txt`);
+            const logFile = fs.createWriteStream(logPath, { flags: 'a' });
+            const log = (...args) => {
+                // Log to console, and to file
+                console.log(`${instanceID} >`, ...args);
+                logFile.write(util.format.apply(null, args) + '\n');
+            };
 
-        // Never wait longer than 4.5 minutes
-        let hasTimedOut = false;
+            log('Booting up Chrome instance', instanceID);
+
+            const result = await extractData(urlsInBatch, thumbnailFolder, log, forceTerminate);
+
+            // Already terminated, don't terminate again
+            forceTerminate.exit = () => { };
+
+            return result;
+        }
+
+        // Never wait longer than 1 minute
+        let timedOut = false;
         const timeout = setTimeout(() => {
-            log('\nRequest timed out\n');
-            hasTimedOut = true;
+            timedOut = true;
+            // Cleanup all running Chrome instances
+            Object.values(batchTerminations).forEach(termination => termination.exit());
+        }, timeoutAfterMs);
 
-            reply.statusCode = 503;
-            reply.send({ error: `Timed out` });
+        // Run batches
+        const promises = Object.entries(batches).map(([instanceID, urlsInBatch]) => {
+            return runBatch(instanceID, urlsInBatch, batchTerminations[instanceID]);
+        });
 
-            forceTerminate.exit();
-            activeChromeInstances--;
-        }, 1000 * 60 * 4.5);
+        const startTime = Date.now();
+        const result = await Promise.all(promises).then((allResults) => {
+            const combinedResults = {
+                openedProjects: [].concat(...allResults.map(r => r.openedProjects)),
+                missingProjects: [].concat(...allResults.map(r => r.missingProjects)),
+                fontSwapProjects: [].concat(...allResults.map(r => r.fontSwapProjects)),
+                unopenedProjects: [].concat(...allResults.map(r => r.unopenedProjects)),
+            };
 
-        const result = await extractData(urls, thumbnailFolder, log, forceTerminate);
-        if (hasTimedOut) return;
+            const totalTime = Date.now() - startTime;
+            const openedLength = combinedResults.openedProjects.length;
+            const perBFD = openedLength ? `(${toSeconds(totalTime / openedLength)}s / BFD)` : '';
+            const resultText = `Generated thumbnails for ${openedLength} / ${urls.length} BFDs in ${toSeconds(totalTime)}s ${perBFD} using ${allResults.length} Chrome instance(s)`;
 
-        activeChromeInstances--;
+            combinedResults.result = resultText;
+
+            return combinedResults;
+        });
+
         clearTimeout(timeout);
+        if (timedOut) {
+            result.result = 'Timed out. ' + result.result;
+        }
+
+        console.log(result.result);
 
         // Add missing fonts to CSV
         const fontsCsvPath = path.join(__dirname, '/../results/missing-fonts.csv');
@@ -187,5 +236,10 @@ module.exports = function addExtractEndpoint(fastify) {
         if (transparencyMismatches.length) fs.appendFileSync(transparencyCsvPath, transparencyMismatches.join('\n') + '\n');
 
         reply.send(result);
+        isRunning = false;
     });
 };
+
+function toSeconds(time) {
+    return (time / 1000).toFixed(1);
+}
