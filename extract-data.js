@@ -473,9 +473,32 @@ async function openProjectAndGenerateThumbnail({
 
   async function waitForLoadingToComplete() {
     await page.$eval('#open_project_menu', () => {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         console.log('Waiting...');
         setTimeout(() => waitSomeMore(resolve), 1000);
+
+        // Never wait longer than 20 seconds
+        const maxWaitTime = 20 * 1000;
+        setTimeout(() => {
+
+          // Cancel project loading
+          // Not fool-proof, but better than nothing
+          if (BeFunky.isLoadScreenActive()) {
+            BeFunky.hideLoadScreen();
+          }
+          if (BFN.ProjectManager.projectLoading) {
+            BFN.ProjectManager.rejectProjectLoading('Timed out')
+          }
+
+          // Dismiss any errors
+          try {
+            BeFunky.getModal().modalElement.querySelector('.button--blue').click();
+          } catch (err) { }
+
+          reject('Project opening timed out');
+
+        }, maxWaitTime);
+
       });
       function waitSomeMore(callback) {
         // Wait for load screen to be hidden twice in case we momentarily
