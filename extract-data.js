@@ -59,6 +59,11 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
     });
   }
 
+  // Log errors
+  page.on('pageerror', (msg) => {
+    log(`PageError > ${msg}`);
+  });
+
   return new Promise((resolveQueue) => {
 
     // Start a preload queue. Projects will be requested (and stored in cache)
@@ -475,11 +480,10 @@ async function openProjectAndGenerateThumbnail({
     await page.$eval('#open_project_menu', () => {
       return new Promise((resolve, reject) => {
         console.log('Waiting...');
-        setTimeout(() => waitSomeMore(resolve), 1000);
 
         // Never wait longer than 20 seconds
         const maxWaitTime = 20 * 1000;
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
 
           // Cancel project loading
           // Not fool-proof, but better than nothing
@@ -498,6 +502,12 @@ async function openProjectAndGenerateThumbnail({
           reject('Project opening timed out');
 
         }, maxWaitTime);
+
+        // Success!
+        setTimeout(() => waitSomeMore(() => {
+          clearTimeout(timeout);
+          resolve();
+        }), 1000);
 
       });
       function waitSomeMore(callback) {
