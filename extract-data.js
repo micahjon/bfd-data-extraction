@@ -476,7 +476,7 @@ async function openProjectAndGenerateThumbnail({
     thumbURL: `/thumbnails/${thumbFileName}`,
     projectWidth,
     projectHeight,
-    text,
+    text: encodeURIComponent(text), // Helps with JSON parsing on PHP end
     sectionID,
     version: bfdVersion,
     sourceTemplateID: sourceTemplateID || '',
