@@ -364,12 +364,23 @@ async function openProjectAndGenerateThumbnail({
   // Get project text, width & height
   const { text, projectWidth, projectHeight, sectionID, sourceTemplateID } = await page.$eval('#open_project_menu', () => {
     const { projectVO } = BFN.AppModel.sectionValue(BFN.PhotoEditorModel, BFN.CollageMakerModel, BFN.DesignerModel);
-    const text = projectVO.transformLabels
+    let text = projectVO.transformLabels
       .map(label => label.labelText)
       .map(str => str.replace(/\s+/g, ' ').trim())
       .filter(str => str && !BFN.FabricManager.isDefaultText(str))
       .join(' ')
       .slice(0, 1000);
+
+    // Fix utf-8 character getting split
+    if (text) {
+      try {
+        encodeURIComponent(text.charAt(text.length - 1));
+      } catch (err) {
+        console.log('Fixing utf-8 character at the end of project text');
+        text = text.slice(0, text.length - 1);
+      }
+    }
+
     const { projectWidth, projectHeight, sourceTemplateID } = projectVO;
     const sectionID = projectVO.section;
     return Promise.resolve({ text, projectWidth, projectHeight, sectionID, sourceTemplateID });
@@ -476,7 +487,7 @@ async function openProjectAndGenerateThumbnail({
     thumbURL: `/thumbnails/${thumbFileName}`,
     projectWidth,
     projectHeight,
-    text: encodeURIComponent(text), // Helps with JSON parsing on PHP end
+    text,
     sectionID,
     version: bfdVersion,
     sourceTemplateID: sourceTemplateID || '',
