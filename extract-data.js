@@ -487,7 +487,7 @@ async function openProjectAndGenerateThumbnail({
     thumbURL: `/thumbnails/${thumbFileName}`,
     projectWidth,
     projectHeight,
-    text,
+    text: encodeURIComponent(text),
     sectionID,
     version: bfdVersion,
     sourceTemplateID: sourceTemplateID || '',
