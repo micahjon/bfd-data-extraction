@@ -10,6 +10,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
   const isHeadless = true; // Headless or windowed mode
   const isDebug = false;
   const startTime = Date.now();
+  const swapFonts = true;
 
   log(`Processing ${urlsToProcess.length} BFD URLs...`);
 
@@ -194,6 +195,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
           projectDescription: `${index} / ${urlsToProcess.length}`,
           log,
           thumbnailFolder,
+          swapFonts,
         });
       } catch (err) {
         log(`!!!\tFailed to open project ${index} / ${urlsToProcess.length}`, fileName, err, '\n');
@@ -205,11 +207,11 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
 
       // Handle projects where the font needs to be swapped
       if (result && result.fontsToSwap) {
-        project.fontsToSwap = result.fontsToSwap;
+        Object.assign(project, result);
         fontSwapProjects.push(project);
       }
       // Handle successful projects
-      if (result && result.thumbURL) {
+      else if (result && result.thumbURL) {
         Object.assign(project, result);
         openedProjects.push(project);
       }
@@ -275,7 +277,7 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
 };
 
 async function openProjectAndGenerateThumbnail({
-  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log, thumbnailFolder, isThumbTransparent,
+  page, isDebug, isHeadless, useGPU, bfdUrl, projectDescription, log, thumbnailFolder, isThumbTransparent, swapFonts,
 }) {
 
   if (!bfdUrl) throw new Error('BFD path/URL missing');
@@ -333,18 +335,29 @@ async function openProjectAndGenerateThumbnail({
   }
 
   // Handle swapped fonts
-  const fontsToSwap = await page.$eval('#open_project_menu', () => {
+  const fontsToSwap = await page.$eval('#open_project_menu', (el, args) => {
     if (Object.keys(BFN.ParseBFD.swappedFonts).length) {
-      // Don't swap fonts
-      BeFunky.getModal().modalElement.querySelector('.button--grey').click();
+      if (args.swapFonts) {
+        // Swap fonts
+        BeFunky.getModal().modalElement.querySelector('.button--blue').click();
+      } else {
+        // Don't swap fonts
+        BeFunky.getModal().modalElement.querySelector('.button--grey').click();
+      }
       return Object.keys(BFN.ParseBFD.swappedFonts);
     }
-  });
+  }, { swapFonts });
 
   if (fontsToSwap) {
-    log(`${projectDescription} Fonts need swapped`, bfdFileName, fontsToSwap);
-    return { fontsToSwap };
+    if (!swapFonts) {
+      log(`${projectDescription} Fonts need swapped`, bfdFileName, fontsToSwap);
+      return { fontsToSwap };
+    }
+    log(`${projectDescription} Swapping fonts...`, bfdFileName, fontsToSwap);
   }
+
+  // Wait for everything to finish loading
+  await waitForLoadingToComplete();
 
   // Make sure project has loaded
   await page.$eval('#open_project_menu', () => {
@@ -384,16 +397,6 @@ async function openProjectAndGenerateThumbnail({
       .replace(/[^\x20-\x7E]/g, '')
       // Truncate to first 1000
       .slice(0, 1000);
-
-    // Fix utf-8 character getting split
-    if (text) {
-      try {
-        encodeURIComponent(text.charAt(text.length - 1));
-      } catch (err) {
-        console.log('Fixing utf-8 character at the end of project text');
-        text = text.slice(0, text.length - 1);
-      }
-    }
 
     const { projectWidth, projectHeight, sourceTemplateID } = projectVO;
     const sectionID = projectVO.section;
@@ -497,7 +500,7 @@ async function openProjectAndGenerateThumbnail({
   // log('Time:', bfdFileName);
   log(`${projectDescription} Thumbnail saved. ${isHeadless ? 'Headless' : 'Windowed'} + ${useGPU ? 'GPU' : 'SwiftShader'}:`, `Processing = ${toSeconds(processingTime)}s. Fetching project = ${toSeconds(timeFetchingProject)}s`);
 
-  return {
+  const result = {
     thumbURL: `/thumbnails/${thumbFileName}`,
     projectWidth,
     projectHeight,
@@ -507,6 +510,12 @@ async function openProjectAndGenerateThumbnail({
     sourceTemplateID: sourceTemplateID || '',
     transparencyMismatch,
   };
+
+  if (fontsToSwap) {
+    result.fontsToSwap = fontsToSwap;
+  }
+
+  return result;
 
   async function waitForLoadingToComplete() {
     await page.$eval('#open_project_menu', () => {
