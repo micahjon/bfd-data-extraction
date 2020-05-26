@@ -364,11 +364,19 @@ async function openProjectAndGenerateThumbnail({
   // Get project text, width & height
   const { text, projectWidth, projectHeight, sectionID, sourceTemplateID } = await page.$eval('#open_project_menu', () => {
     const { projectVO } = BFN.AppModel.sectionValue(BFN.PhotoEditorModel, BFN.CollageMakerModel, BFN.DesignerModel);
-    let text = projectVO.transformLabels
+    const text = projectVO.transformLabels
       .map(label => label.labelText)
       .map(str => str.replace(/\s+/g, ' ').trim())
       .filter(str => str && !BFN.FabricManager.isDefaultText(str))
       .join(' ')
+      // Convert characters to ASCII equivalents
+      // https://stackoverflow.com/a/37511463/1546808
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      // Remove non-printable ASCII characters
+      // https://www.w3resource.com/javascript-exercises/javascript-string-exercise-32.php
+      .replace(/[^\x20-\x7E]/g, '')
+      // Truncate to first 1000
       .slice(0, 1000);
 
     // Fix utf-8 character getting split
