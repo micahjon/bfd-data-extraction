@@ -31,11 +31,14 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
 
   // Allow parent process to exit
   let wasTerminated = false;
+  let afterTermination = () => { };
   forceTerminate.exit = async () => {
     log('Request timed out');
     wasTerminated = true;
     await context.close();
     await browser.close();
+
+    setTimeout(afterTermination, 1000);
   };
 
   // Add testing flags
@@ -66,6 +69,9 @@ module.exports = async (urlsToProcess, thumbnailFolder, log, forceTerminate = {}
   });
 
   return new Promise((resolveQueue) => {
+
+    // Ensure Promise resolves if process is terminated
+    afterTermination = () => { resolveQueue(cleanupBrowserAndGetResults()) };
 
     // Start a preload queue. Projects will be requested (and stored in cache)
     // and then opened when browser is ready
