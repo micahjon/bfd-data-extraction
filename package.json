@@ -11,7 +11,7 @@
   "dependencies": {
     "fastify": "^2.13.1",
     "fastify-server-timeout": "^0.1.1",
-    "fastify-static": "^2.7.0",
+    "fastify-static": "^4.2.4",
     "playwright": "^0.15.0"
   }
 }
